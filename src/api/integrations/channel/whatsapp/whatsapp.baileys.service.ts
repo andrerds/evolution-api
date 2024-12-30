@@ -3274,14 +3274,22 @@ export class BaileysStartupService extends ChannelStartupService {
     onWhatsapp.push(...groups);
 
     // USERS
-    const contacts: any[] = await this.prismaRepository.contact.findMany({
-      where: {
-        instanceId: this.instanceId,
-        remoteJid: {
-          in: jids.users.map(({ jid }) => jid),
+    let contacts: any[] = [];
+    try {
+      contacts = await this.prismaRepository.contact.findMany({
+        where: {
+          instanceId: this.instanceId,
+          remoteJid: {
+            in: jids.users.map(({ jid }) => jid),
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      this.logger.error(`Failed to fetch contacts for JID: ${jids.users.map(({ jid }) => jid)} : Error: ` + error);
+      return []; // Retorna um array vazio em caso de erro para continuar o fluxo
+    }
+
+    
 
     const numbersToVerify = jids.users.map(({ jid }) => jid.replace('+', ''));
 

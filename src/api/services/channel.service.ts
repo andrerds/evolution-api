@@ -189,6 +189,10 @@ export class ChannelStartupService {
   }
 
   public async findSettings() {
+    if (!this.instanceId) {
+      return null;
+    }
+
     const data = await this.prismaRepository.setting.findUnique({
       where: {
         instanceId: this.instanceId,
@@ -512,25 +516,58 @@ export class ChannelStartupService {
     return `${number}@s.whatsapp.net`;
   }
 
+  // public async fetchContacts(query: Query<Contact>) {
+  //   const remoteJid = query?.where?.remoteJid
+  //     ? query?.where?.remoteJid.includes('@')
+  //       ? query.where?.remoteJid
+  //       : this.createJid(query.where?.remoteJid)
+  //     : null;
+
+  //   const where = {
+  //     instanceId: this.instanceId,
+  //   };
+
+  //   if (remoteJid) {
+  //     where['remoteJid'] = remoteJid;
+  //   }
+
+  //   return await this.prismaRepository.contact.findMany({
+  //     where,
+  //   });
+  // }
+ 
   public async fetchContacts(query: Query<Contact>) {
-    const remoteJid = query?.where?.remoteJid
-      ? query?.where?.remoteJid.includes('@')
-        ? query.where?.remoteJid
-        : this.createJid(query.where?.remoteJid)
-      : null;
+    // Valida e formata o remoteJid, se necessário
 
-    const where = {
-      instanceId: this.instanceId,
-    };
+    let remoteJid = query?.where?.remoteJid
+    ? query?.where?.remoteJid.includes('@')
+      ? query.where?.remoteJid
+      : this.createJid(query.where?.remoteJid)
+    : null;
 
-    if (remoteJid) {
-      where['remoteJid'] = remoteJid;
+    if (query?.where?.remoteJid) {
+        remoteJid = query?.where?.remoteJid.includes('@')
+            ? query?.where?.remoteJid // Já é um JID completo
+            : this.createJid(query?.where?.remoteJid); // Formata o JID
     }
 
-    return await this.prismaRepository.contact.findMany({
-      where,
-    });
-  }
+    // Construção do filtro `where`
+    const where = {
+        instanceId: this.instanceId, // Filtra pela instância atual
+        ...(remoteJid ? { remoteJid } : {}), // Adiciona remoteJid, se aplicável
+    };
+
+    try {
+        // Realiza a consulta no banco
+        const contacts = await this.prismaRepository.contact.findMany({ where });
+        this.logger.info(`Fetched ${contacts.length} contacts.`); // Log informativo
+        return contacts;
+    } catch (error) {
+        // Loga o erro com detalhes e continua
+        this.logger.warn('Failed to fetch contacts. Error:  ' + error);
+        return [];
+    }
+}
 
   public async fetchMessages(query: Query<Message>) {
     const keyFilters = query?.where?.key as {
